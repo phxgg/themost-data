@@ -179,8 +179,10 @@ DataStateValidatorListener.prototype.beforeSave = function(event, callback) {
         }
         //get key state
         var keyState = (model.primaryKey && hasOwnProperty(target, model.primaryKey));
+        //check if $state is explicitly forced by the caller
+        var hasForceState = hasOwnProperty(event.target, '$state') && event.target.$state;
         //if target has $state property defined, set this state and exit
-        if (event.target.$state) {
+        if (hasForceState) {
             event.state = event.target.$state;
         }
         //if object has primary key
@@ -203,6 +205,10 @@ DataStateValidatorListener.prototype.beforeSave = function(event, callback) {
         }
         else if (event.state === 1) {
             if (!keyState) {
+                //if $state is explicitly forced by the caller, skip
+                if (hasForceState) {
+                    return callback();
+                }
                 return mapKey_.call(model, target, function(err, result) {
                     if (err) { return callback(err); }
                     if (result) {

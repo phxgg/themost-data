@@ -2,6 +2,7 @@ import {TestApplication, TestApplication2} from './TestApplication';
 import {DataContext} from '../index';
 import {resolve} from 'path';
 import {TestUtils} from './adapter/TestUtils';
+import {DataStateValidatorListener} from '../data-state-validator';
 
 describe('DataModel.upsert', () => {
     let app: TestApplication;
@@ -74,6 +75,55 @@ describe('DataModel.upsert', () => {
             expect(inserted).toBeTruthy();
             expect(inserted.name).toEqual('Review and merge');
 
+            Object.assign(context, {
+                user: null
+            });
+        });
+    });
+
+    it('should respect $state=1 on force insert', async () => {
+        await TestUtils.executeInTransaction(context, async () => {
+            Object.assign(context, {
+                user: {
+                    name: 'alexis.rees@example.com'
+                }
+            });
+            const AccessLevelTypes = context.model('AccessLevelType');
+            //insert a new item
+            const item = {
+                id: 999,
+                name: 'test level',
+                alternateName: 'testLevel'
+            };
+            await AccessLevelTypes.silent().insert(item);
+            const inserted = await AccessLevelTypes.where('id').equal(999).getItem();
+            expect(inserted).toBeTruthy();
+
+            //now use magic $state=1 on a new item reusing the same alternateName
+            //before, DataStateValidatorListener would find the existing record by unique constraint and change state=2 (update)
+            // this would cause the existing record to be updated instead of inserting a new one
+            const newInsert = {
+                id: 998,
+                name: 'test level force insert',
+                alternateName: 'testLevel',
+                $state: 1
+            };
+            //state should remain 1 (insert)
+            //the unique constraint lookup must not override it
+            const event = {
+                model: AccessLevelTypes,
+                target: newInsert,
+                state: null
+            };
+            const validator = new DataStateValidatorListener();
+            await new Promise<void>((resolve, reject) => {
+                validator.beforeSave(event, (err) => {
+                    if (err) { return reject(err); }
+                    return resolve();
+                });
+            });
+            //state must remain 1
+            expect(event.state).toEqual(1);
             Object.assign(context, {
                 user: null
             });

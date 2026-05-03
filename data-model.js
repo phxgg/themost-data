@@ -2195,12 +2195,20 @@ function insert_(obj, callback) {
     if ((obj===null) || obj === undefined) {
         callback.call(self, null);
     }
-    //set state
+    //only force $state=1 when the object already has a primary key.
+    //objects without a primary key can still be distinguished by DataStateValidatorListener
+    //when user sets $state=1
     if (_.isArray(obj)) {
-        obj.forEach(function(x) {x['$state'] = 1; })
+        obj.forEach(function(x) {
+            if (x[self.primaryKey] != null) {
+                x['$state'] = 1;
+            }
+        });
     }
     else {
-        obj['$state'] = 1;
+        if (obj[self.primaryKey] != null) {
+            obj['$state'] = 1;
+        }
     }
     self.save(obj, callback);
 }
